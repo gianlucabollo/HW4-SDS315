@@ -1,0 +1,199 @@
+---
+title: "SDS HW 4"
+author: "Gianluca Bollo (gb25625) - https://github.com/gianlucabollo/HW4-SDS315"
+date: "2/20/2024"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.width = 8, fig.height = 5)
+```
+
+```{r import data and packaages}
+library(tidyverse)
+library(mosaic)
+gas_data = read.csv('gasprices.csv')
+s_class = read.csv('sclass.csv')
+nbc_shows = read.csv('nbc_pilotsurvey.csv')
+ebay = read.csv('ebay.csv')
+```
+
+# \centering Austin Gas Prices Analysis
+
+## \centering Claim A: Gas stations charge more if they lack direct competition in sight.
+
+```{r Q1A}
+boot_price_competitors = do(10000)*diffmean(Price ~ Competitors,
+data = resample(gas_data))
+
+ggplot(boot_price_competitors) + geom_histogram(aes(x = diffmean))
+confint(boot_price_competitors, level = 0.95)
+```
+
+### Evidence: The difference in price between gas stations with and without competition in sight is somewhere between -0.055 and 0.007, with 95% confidence.
+
+### Conclusion: Due to this confidence interval containing 0 (not statistically significant) and the fact that the interval itself contains all relatively small values, the claim that "Gas stations charge more if they lack direct competition in sight" is not supported by the data.
+
+\newpage
+
+## \centering Claim B: The richer the area, the higher the gas prices.
+
+```{r Q1B}
+boot_price_income = do(10000)*cor(Price ~ Income, data = resample(gas_data))
+ggplot(boot_price_income) + geom_histogram(aes(x = cor))
+confint(boot_price_income, level = 0.95)
+```
+
+### Evidence: The correlation coefficient between gas price and median household income of a certain area is somewhere between 0.197 and 0.564, with 95% confidence.
+
+### Conclusion: Due to this confidence interval not containing 0 (statistically significant) and the fact that the interval represents a weak to moderate correlation, the claim that "The richer the area, the higher the gas prices" is slightly supported by the data, in terms of correlation.
+
+\newpage
+
+## \centering Claim C: Gas stations at stoplights charge more.
+
+```{r Q1C}
+boot_price_stoplight = do(10000)*diffmean(Price ~ Stoplight,
+data = resample(gas_data))
+
+ggplot(boot_price_stoplight) + geom_histogram(aes(x = diffmean))
+confint(boot_price_stoplight, level = 0.95)
+```
+
+### Evidence: The difference in price between gas stations with and without stoplights in front of them is somewhere between -0.039 and 0.030, with 95% confidence.
+
+### Conclusion: Due to this confidence interval containing 0 (not statistically significant) and the fact that the interval itself contains all relatively small values, the claim that "Gas stations at stoplights charge more" is not supported by the data.
+
+\newpage
+
+## \centering Claim D: Gas stations with direct highway access charge more.
+
+```{r Q1D}
+boot_price_highway = do(10000)*diffmean(Price ~ Highway,
+data = resample(gas_data))
+
+ggplot(boot_price_highway) + geom_histogram(aes(x = diffmean))
+confint(boot_price_highway, level = 0.95)
+```
+
+### Evidence: The difference in price between gas stations with and without direct highway access is somewhere between 0.009 and 0.081, with 95% confidence.
+
+### Conclusion: Although this confidence interval does not contain 0 (statistically significant), the mean difference of price, according to the interval, is very small. So practically speaking, the claim that "Gas stations at stoplights charge more" is not supported by the data.
+
+\newpage
+
+## \centering Claim E: Shell charges more than all other non-Shell brands.
+
+```{r Q1E}
+boot_price_shell = do(10000) * {
+  resampled_gas = resample(gas_data)
+  shell = filter(resampled_gas, Name == 'Shell')
+  nonshell = filter(resampled_gas, Name != 'Shell')
+  mean(shell$Price) - mean(nonshell$Price)
+  }
+
+ggplot(boot_price_shell) + geom_histogram(aes(x = result)) + labs(x = 'diffmean')
+confint(boot_price_shell, level = 0.95)
+```
+
+### Evidence: The difference in price between shell gas stations and all other non-Shell brands is somewhere between -0.011 and 0.065, with 95% confidence.
+
+### Conclusion: Due to this confidence interval containing 0 (not statistically significant) and the fact that the interval itself contains all relatively small values, the claim that "Shell charges more than all other non-Shell brands" is not supported by the data.
+
+\newpage
+
+```{r, Q2A}
+trim_year_filter = filter(s_class, trim == '63 AMG', year == 2011)
+boot_trim_year = do(10000)*mean(resample(trim_year_filter)$mileage)
+ggplot(boot_trim_year) + geom_histogram(aes(x = mean)) + labs(title = 'Bootstrapped distribution for the average mileage of 2011 S-Class 63 AMGs ')
+confint(boot_trim_year, level = 0.95)
+```
+
+### The average mileage of 2011 S-Class 63 AMGs that were hitting the used-car market when this data was collected is somewhere between 26245.82 and 31842 miles, with 95% confidence.
+
+\newpage
+
+```{r, Q2B}
+trim_year_filter_two = filter(s_class, trim == "550", year == 2014)
+boot_trim_year_two = do(10000)*prop(resample(trim_year_filter_two)$color == 'Black')
+ggplot(boot_trim_year_two) + geom_histogram(aes(x = prop_TRUE)) + labs(title = 'Bootstrapped distribution for all 2014 S-Class 550s that were painted black')
+confint(boot_trim_year_two, level = 0.95)
+```
+
+### The the proportion of all 2014 S-Class 550s that were painted black is somewhere between .417 and .453, with 95% confidence.
+
+\newpage
+
+## \centering Is there evidence that one show consistently produces a higher mean Q1_Happy response among viewers?
+
+```{r, Q3A}
+ed_earl_shows = filter(nbc_shows, Show == "Living with Ed" | Show == "My Name is Earl")
+
+ed_earl_boot = do(10000)*diffmean(Q1_Happy ~ Show, data = resample(ed_earl_shows))
+ggplot(ed_earl_boot) + geom_histogram(aes(x = diffmean))
+confint(ed_earl_boot, level = 0.95)
+
+ed_earl_shows %>%
+  group_by(Show) %>%
+  summarize(mean = mean(Q1_Happy))
+```
+
+### Approach: To answer this question, I filtered the nbc show data set to only data describing "Living with Ed" and "My Name is Earl". I then collected 10,000 bootstrapped samples and calculated the difference in means between the shows for the Q1_Happy variable for each sample. Finally, I constructed a histogram and confidence interval (using confint function) of all the bootstrapped samples.
+
+### Results: Evidence that this approach provided was a 95% confidence interval that estimates the population value of difference in mean Q1_Happy response between both shows. According to the data, the difference in mean Q1_Happy responses between these two shows is somewhere between -0.392 and 0.098 with 95% confidence.
+
+### Conclusion: Due to the fact that this confidence interval contains 0 (not statistically significant) and the estimated population difference is only -0.149, the claim that one show makes viewers happier over the other is not strongly supported by the data. With that said, there is no evidence that one show consistently produces a higher mean Q1_Happy response among viewers.
+
+\newpage
+
+## \centering Which reality/contest show made people feel more annoyed?
+
+```{r, Q3B}
+loser_apprentice_shows = filter(nbc_shows, Show == "The Biggest Loser" | Show == "The Apprentice: Los Angeles")
+loser_apprentice_boot = do(10000)*diffmean(Q1_Annoyed ~ Show, data = resample(loser_apprentice_shows))
+ggplot(loser_apprentice_boot) + geom_histogram(aes(x = diffmean))
+confint(loser_apprentice_boot, level = 0.95)
+loser_apprentice_shows %>%
+  group_by(Show) %>%
+  summarize(mean = mean(Q1_Annoyed))
+```
+
+### Approach: To answer this question, I filtered the nbc show data set to only data describing "The Biggest Loser" and "The Apprentice: Los Angeles". I then collected 10,000 bootstrapped samples and calculated the difference in means between the shows for the Q1_Annoyed variable for each sample. Finally, I constructed a histogram and confidence interval (using confint function) of all the bootstrapped samples.
+
+### Results: Evidence that this approach provided was a 95% confidence interval  that estimates the population value for the difference in mean Q1_Annoyed response between both shows. According to the data, the difference in mean Q1_Annoyed responses between these two shows is somewhere between -0.512 and -0.020, with 95% confidence.
+
+### Conclusion: Due to the fact that this confidence interval does not contain 0 (statistically significant) and the lower bound of the mean is more than half a point, the result proves to be practically significant as well. The data-supported answer to the question "Which reality/contest show made people feel more annoyed?" is "The Apprentice: Los Angeles".
+
+\newpage
+
+## \centering  What proportion of American TV watchers would we expect to give a response of 4 or greater to the "Q2_Confusing" question?
+
+```{r, Q3C}
+dwts = filter(nbc_shows, Show == "Dancing with the Stars")
+
+dwts_boot = do(10000)*prop(resample(dwts)$Q2_Confusing >= 4)
+confint(dwts_boot, level = 0.95)
+```
+
+### Approach: To answer this question, I filtered the nbc show data set to only data describing "Dancing With the Stars" . I then collected 10,000 bootstrapped samples and calculated the proportion of watchers that gave a response of 4 or greater to the "Q2_Confusing" question for each sample. Finally, I constructed a histogram and confidence interval (using confint function) of all the bootstrapped samples.
+
+### Results: Evidence that this approach provided was a 95% confidence interval that estimates the population value for the proportion of DWTS watchers that gave a response of 4 or greater to the "Q2_Confusing" question. According to the data, this proportion is somewhere between 0.039 and 0.116, with 95% confidence.
+
+### Conclusion: The data-supported answer to the question "What proportion of American TV watchers would we expect to give a response of 4 or greater to the "Q2_Confusing" question?" is estimated to be somewhere between .039 and 0.116, with 95% confidence. The mean value of all bootstrapped samples (p hat) is .077.
+
+\newpage
+
+## \centering  Does paid search advertising on Google create extra revenue for EBay?
+```{r, Q4}
+boot_ebay_revratio = do(10000)*diffmean(rev_ratio ~ adwords_pause, data = resample(ebay))
+confint(boot_ebay_revratio, level = 0.95)
+```
+
+### Approach: To answer this question, I collected 10,000 bootstrapped samples from the ebay.csv dataset and calculated the mean difference of revenue ratio between the control and treatment groups. Finally, I constructed a histogram and confidence interval (using confint function) of all the bootstrapped samples.
+
+### Results: Evidence that this approach provided was a 95% confidence interval that estimates the population value for the mean difference of revenue ratio between the adwords enabled / disabled groups. According to the data, this value is somewhere between -0.091 and -0.013, with 95% confidence.
+
+### Conclusion: Statistically speaking, because the confidence interval does not contain 0, the findings are statistically significant. Taking a more practical approach to make a conclusion, however, would be to inspect just how big this mean difference is, relative to the total revenue values. Differences within this interval, when looking at revenue in the tens of millions, could be worth hundreds of thousands to even millions of dollars. So in practical terms as well, paid search advertising on Google does create extra revenue for EBay. The estimated value from all bootstrapped samples is -0.052.
+
